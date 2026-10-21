@@ -12,6 +12,55 @@
             padding: 50px;
             text-align: center;
         }
+
+        /* Botão de encerrar atendimento.
+           Fica escondido até o chat ser aberto.
+           Ajuste "bottom" e "right" para encostar o botão na janela do chat. */
+        #hf-encerrar {
+            display: none;
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 2147483647;
+            padding: 10px 18px;
+            font-family: Arial, sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            color: #1f2a1a;
+            background-color: #d4ebc0;
+            border: 1px solid #a9cf8c;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+        }
+
+        #hf-encerrar:hover {
+            background-color: #c3e2a9;
+        }
+
+        #hf-encerrar:focus-visible {
+            outline: 3px solid #4a7a2c;
+            outline-offset: 2px;
+        }
+
+        #hf-encerrar:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        /* Painel de diagnóstico, só para a fase de teste */
+        #hf-log {
+            max-width: 520px;
+            margin: 30px auto 0;
+            padding: 12px 16px;
+            text-align: left;
+            font-family: monospace;
+            font-size: 13px;
+            color: #333;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
     </style>
 </head>
 <body>
@@ -19,9 +68,58 @@
     <h1>Ambiente de Teste do Chatbot</h1>
     <p>O balão de atendimento da J.assy vai carregar no canto inferior direito.</p>
 
-    
-    <script src=https://webchat.hyperflow.global/sdk.js></script>
-<script>Hyperflow.init("4d3812251baee5f85265645608d30997")</script>
-    
+    <!-- Painel de diagnóstico (pode apagar quando for para o site oficial) -->
+    <div id="hf-log">Aguardando a Web SDK carregar...</div>
+
+    <!-- Botão de encerrar atendimento -->
+    <button id="hf-encerrar" type="button" disabled>End chat</button>
+
+    <!-- Script Nativo do Hyperflow (Não exige mudança no fluxo) -->
+    <script src="https://webchat.hyperflow.global/sdk.js"></script>
+    <script>Hyperflow.init("4d3812251baee5f85265645608d30997")</script>
+
+    <!-- Encerramento pelo cliente: precisa ficar DEPOIS do script do Hyperflow -->
+    <script>
+        var ID_FLUXO_ENCERRAMENTO = 'yg_o5bsi1';
+
+        var botao = document.getElementById('hf-encerrar');
+        var painel = document.getElementById('hf-log');
+
+        function registrar(texto) {
+            var hora = new Date().toLocaleTimeString('pt-BR');
+            painel.innerHTML += '<br>[' + hora + '] ' + texto;
+        }
+
+        // SDK carregada: libera o botão
+        Hyperflow.on('ready', function () {
+            botao.disabled = false;
+            registrar('Web SDK pronta.');
+        });
+
+        // Chat aberto: mostra o botão / chat fechado: esconde
+        Hyperflow.on('open', function () {
+            botao.style.display = 'block';
+            registrar('Chat aberto.');
+        });
+
+        Hyperflow.on('close', function () {
+            botao.style.display = 'none';
+            registrar('Chat fechado.');
+        });
+
+        // Clique no botão: confirma e dispara o fluxo de encerramento
+        botao.addEventListener('click', function () {
+            if (!confirm('Do you want to end this chat?')) return;
+
+            try {
+                Hyperflow.initFlow(ID_FLUXO_ENCERRAMENTO);
+                registrar('Fluxo de encerramento disparado (' + ID_FLUXO_ENCERRAMENTO + ').');
+            } catch (erro) {
+                registrar('Erro ao disparar o fluxo: ' + erro.message);
+                console.error(erro);
+            }
+        });
+    </script>
+
 </body>
 </html>
