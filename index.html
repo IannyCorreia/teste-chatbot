@@ -13,30 +13,37 @@
             text-align: center;
         }
 
-        /* Botão de encerrar atendimento.
-           Fica escondido até o chat ser aberto.
-           Ajuste "bottom" e "right" para encostar o botão na janela do chat. */
+        /* ===== Aba "End chat" presa acima do cabeçalho do chat ===== */
         #hf-encerrar {
-            display: none;
+            display: none;                 /* só aparece com o chat aberto */
             position: fixed;
-            right: 24px;
-            bottom: 24px;
+            top: 0;
+            right: 0;
+            transform: translateY(-100%);  /* a base da aba encosta no topo do chat */
             z-index: 2147483647;
-            padding: 10px 18px;
+
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px 8px;
             font-family: Arial, sans-serif;
-            font-size: 15px;
+            font-size: 13px;
             font-weight: bold;
             color: #1f2a1a;
-            background-color: #d4ebc0;
-            border: 1px solid #a9cf8c;
-            border-radius: 20px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            background-color: #d4ebc0;     /* mesmo verde do cabeçalho do chat */
+            border: none;
+            border-radius: 10px 10px 0 0;  /* cantos arredondados só em cima */
             cursor: pointer;
         }
 
-        #hf-encerrar:hover {
-            background-color: #c3e2a9;
+        #hf-encerrar.visivel { display: inline-flex; }
+
+        #hf-encerrar svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
         }
+
+        #hf-encerrar:hover { background-color: #c3e2a9; }
 
         #hf-encerrar:focus-visible {
             outline: 3px solid #4a7a2c;
@@ -46,6 +53,19 @@
         #hf-encerrar:disabled {
             opacity: 0.6;
             cursor: wait;
+        }
+
+        /* Mobile: aba maior, com área de toque confortável */
+        @media (max-width: 600px) {
+            #hf-encerrar {
+                padding: 10px 16px 11px;
+                font-size: 15px;
+                border-radius: 12px 12px 0 0;
+            }
+            #hf-encerrar svg {
+                width: 16px;
+                height: 16px;
+            }
         }
 
         /* Painel de diagnóstico, só para a fase de teste */
@@ -71,8 +91,15 @@
     <!-- Painel de diagnóstico (pode apagar quando for para o site oficial) -->
     <div id="hf-log">Aguardando a Web SDK carregar...</div>
 
-    <!-- Botão de encerrar atendimento -->
-    <button id="hf-encerrar" type="button" disabled>End chat</button>
+    <!-- Aba de encerrar atendimento -->
+    <button id="hf-encerrar" type="button" disabled aria-label="End chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2v10"></path>
+            <path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path>
+        </svg>
+        End chat
+    </button>
 
     <!-- Script Nativo do Hyperflow (Não exige mudança no fluxo) -->
     <script src="https://webchat.hyperflow.global/sdk.js"></script>
@@ -82,33 +109,93 @@
     <script>
         var ID_FLUXO_ENCERRAMENTO = 'yg_o5bsi1';
 
-        var botao = document.getElementById('hf-encerrar');
+        // Ajustes finos de posição (em px), caso a aba fique um pouco deslocada
+        var DISTANCIA_DA_DIREITA = 12;  // quanto a aba fica afastada da borda direita do chat
+        var AJUSTE_VERTICAL = 0;        // positivo desce a aba, negativo sobe
+
+        var aba = document.getElementById('hf-encerrar');
         var painel = document.getElementById('hf-log');
+        var chatAberto = false;
+        var vigia = null;
 
         function registrar(texto) {
             var hora = new Date().toLocaleTimeString('pt-BR');
             painel.innerHTML += '<br>[' + hora + '] ' + texto;
         }
 
-        // SDK carregada: libera o botão
+        // Procura na página a janela do chat da Hyperflow (o maior elemento
+        // do widget visível) e devolve a posição dela na tela
+        function acharJanelaDoChat() {
+            var candidatos = document.querySelectorAll(
+                'iframe, [id*="hyperflow" i], [class*="hyperflow" i]'
+            );
+            var melhor = null;
+            var maiorArea = 0;
+
+            candidatos.forEach(function (el) {
+                if (el === aba || el === painel) return;
+                var r = el.getBoundingClientRect();
+                var area = r.width * r.height;
+                // ignora o balão fechado e elementos pequenos
+                if (r.width >= 250 && r.height >= 300 && area > maiorArea) {
+                    melhor = r;
+                    maiorArea = area;
+                }
+            });
+            return melhor;
+        }
+
+        // Cola a aba no topo da janela do chat, alinhada à direita
+        function posicionarAba() {
+            var janela = acharJanelaDoChat();
+            if (!janela) return;
+
+            var topo = Math.max(janela.top + AJUSTE_VERTICAL, aba.offsetHeight);
+            var direita = window.innerWidth - janela.right + DISTANCIA_DA_DIREITA;
+
+            aba.style.top = topo + 'px';
+            aba.style.right = direita + 'px';
+        }
+
+        function mostrarAba() {
+            aba.classList.add('visivel');
+            posicionarAba();
+            // reposiciona enquanto o chat estiver aberto (animação de abertura,
+            // rotação do celular, teclado do mobile etc.)
+            clearInterval(vigia);
+            vigia = setInterval(posicionarAba, 300);
+        }
+
+        function esconderAba() {
+            aba.classList.remove('visivel');
+            clearInterval(vigia);
+        }
+
+        // SDK carregada: libera a aba e garante que ela fique por cima do chat
         Hyperflow.on('ready', function () {
-            botao.disabled = false;
+            document.body.appendChild(aba);
+            aba.disabled = false;
             registrar('Web SDK pronta.');
         });
 
-        // Chat aberto: mostra o botão / chat fechado: esconde
         Hyperflow.on('open', function () {
-            botao.style.display = 'block';
+            chatAberto = true;
+            mostrarAba();
             registrar('Chat aberto.');
         });
 
         Hyperflow.on('close', function () {
-            botao.style.display = 'none';
+            chatAberto = false;
+            esconderAba();
             registrar('Chat fechado.');
         });
 
-        // Clique no botão: confirma e dispara o fluxo de encerramento
-        botao.addEventListener('click', function () {
+        window.addEventListener('resize', function () {
+            if (chatAberto) posicionarAba();
+        });
+
+        // Clique: confirma e dispara o fluxo de encerramento
+        aba.addEventListener('click', function () {
             if (!confirm('Do you want to end this chat?')) return;
 
             try {
