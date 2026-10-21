@@ -194,10 +194,8 @@
             if (chatAberto) posicionarAba();
         });
 
-        // Clique: confirma e dispara o fluxo de encerramento
+        // Clique: dispara o fluxo de encerramento
         aba.addEventListener('click', function () {
-            if (!confirm('Do you want to end this chat?')) return;
-
             try {
                 Hyperflow.initFlow(ID_FLUXO_ENCERRAMENTO);
                 registrar('Fluxo de encerramento disparado (' + ID_FLUXO_ENCERRAMENTO + ').');
